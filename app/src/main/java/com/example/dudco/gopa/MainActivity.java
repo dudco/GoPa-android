@@ -26,6 +26,8 @@ import com.androidquery.AQuery;
 import com.androidquery.callback.AjaxCallback;
 import com.androidquery.callback.AjaxStatus;
 import com.example.dudco.gopa.databinding.ActivityMainBinding;
+import com.github.nkzawa.socketio.client.IO;
+import com.github.nkzawa.socketio.client.Socket;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -39,6 +41,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +58,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private static Marker marker;
     private ArrayList<LatLng> polyDatas = new ArrayList<>();
 
+    private int totalTime;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,6 +70,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMapFragment.getMapAsync(this);
 
         gpsInfo = new GpsInfo(this);
+
+        mSocket.connect();
 
         binding.btnSearch.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -85,8 +92,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     map.clear();
                     getPoly(new LatLng(gpsInfo.getLatitude(), gpsInfo.getLongitude()), new LatLng(end.getLat(), end.getLog()), new Callback() {
                         @Override
-                        public void callback(PolylineOptions options) {
-
+                        public void callback(PolylineOptions options, int time) {
+                            totalTime = time;
                             map.addPolyline(options);
                             addMarker("현재위치", gpsInfo.getLatitude(), gpsInfo.getLongitude(), false);
                             addMarker("목적지", end.getLat(), end.getLog(), false);
@@ -94,7 +101,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 //                            sendSMS(binding.editCallnum.getText().toString(), "TEST");
                             polyDatas.clear();
                             polyDatas.addAll(options.getPoints());
-                            startNavi();
+                            Util.startRiding(MainActivity.this);
+                            emitData(end.getLat(), end.getLog(), gpsInfo.getLatitude(), gpsInfo.getLongitude(), totalTime);
+//                            startNavi();
                         }
                     });
                 }
@@ -105,7 +114,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     double nowLog;
 
     Handler handler = new Handler();
-
     private void startNavi(){
         new Thread(new Runnable() {
             @Override
@@ -144,6 +152,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             map.addPolyline(new PolylineOptions().addAll(polyDatas));
                         }
                     });
+
+                    emitData(end.getLat(), end.getLog(), nowLat, nowLog, totalTime - sec);
                 }
             }
         }).start();
@@ -217,7 +227,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         }
                     }
 
-                    callback.callback(new PolylineOptions().addAll(polyDatas).color(Color.RED).width(15));
+                    totalTime = array.getJSONObject(0).getJSONObject("properties").getInt("totalTime");
+
+                    callback.callback(new PolylineOptions().addAll(polyDatas).color(Color.RED).width(15), totalTime);
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -259,8 +271,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d("dudco", "remove" + ":" + lat + "," + log);
         addMarker("현재위치: " + lat + "," + log, lat, log, true);
         addMarker("목적지", end.getLat(), end.getLog(), false);
-//        map.addMarker(new MarkerOptions().title("현재위치 : "+ lat + "," + log).position(new LatLng(lat, log)));
-//        marker = map.addMarker(new MarkerOptions().title("목적지").position(new LatLng(end.getLat(), end.getLog())));
     }
 
     private void permission(){
@@ -306,6 +316,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     interface Callback{
-        void callback(PolylineOptions options);
+        void callback(PolylineOptions options, int time);
+    }
+
+    public void emitData(double elat, double elon, double dlat, double dlon, int time){
+        Map<String, String> map = new HashMap<>();
+        map.put("userX", String.valueOf(elon));
+        map.put("userY", String.valueOf(elat));
+        map.put("driverX", String.valueOf(dlon));
+        map.put("driverY", String.valueOf(dlat));
+        map.put("time", String.valueOf(time));
+        JSONObject json = new JSONObject(map);
+        mSocket.emit("location", json);
+    }
+
+    private Socket mSocket;
+    {
+        try {
+            mSocket = IO.socket("http://soylatte.kr:3000");
+        } catch (URISyntaxException e) {}
     }
 }

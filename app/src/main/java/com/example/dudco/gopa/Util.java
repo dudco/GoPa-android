@@ -1,5 +1,18 @@
 package com.example.dudco.gopa;
 
+import android.content.Context;
+import android.util.Log;
+
+import com.androidquery.AQuery;
+import com.androidquery.callback.AjaxCallback;
+import com.androidquery.callback.AjaxStatus;
+import com.github.nkzawa.socketio.client.IO;
+import com.github.nkzawa.socketio.client.Socket;
+
+import org.json.JSONObject;
+
+import java.net.URISyntaxException;
+
 /**
  * Created by dudco on 2017. 5. 14..
  */
@@ -43,5 +56,18 @@ public class Util {
     private static double rad2deg(double rad) {
         return (rad * 180 / Math.PI);
     }
+
+    public static String token = "ZKjEN9USmYqoOET";
+
+    public static void startRiding(Context context){
+        AQuery aq = new AQuery(context);
+        aq.ajax("http://soylatte.kr:3000/rider/start?driverId="+token, String.class, new AjaxCallback<String>(){
+            @Override
+            public void callback(String url, String object, AjaxStatus status) {
+                Log.d("dudco", object);
+            }
+        });
+    }
+
 
 }
