@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <declare-styleable name="CustomTextView">
-        <attr name="font" format="string"/>
+        <attr name="text_font" format="string"/>
+        <attr name="text_size_pt" format="string"/>
+    </declare-styleable>
+
+    <declare-styleable name="CustomEditText">
+        <attr name="edit_font" format="string"/>
+        <attr name="edit_size_pt" format="string"/>
     </declare-styleable>
 </resources>

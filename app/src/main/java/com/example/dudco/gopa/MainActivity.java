@@ -1,16 +1,26 @@
 package com.example.dudco.gopa;
 
 import android.Manifest;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.databinding.DataBindingUtil;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.telephony.SmsManager;
 import android.util.Log;
+import android.view.View;
+import android.widget.Toast;
 
 import com.androidquery.AQuery;
 import com.androidquery.callback.AjaxCallback;
@@ -21,6 +31,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 
@@ -39,6 +50,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private GpsInfo gpsInfo;
     private GoogleMap map;
+
+    private PlaceData end;
+    private static Marker marker;
+    private ArrayList<LatLng> polyDatas = new ArrayList<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -49,9 +65,120 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mMapFragment.getMapAsync(this);
 
         gpsInfo = new GpsInfo(this);
+
+        binding.btnSearch.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(gpsInfo.isGetLocation()){
+                    Intent intent = new Intent(MainActivity.this, SearchActivity.class);
+                    intent.putExtra("lat", String.valueOf(gpsInfo.getLatitude()));
+                    intent.putExtra("log", String.valueOf(gpsInfo.getLongitude()));
+                    startActivityForResult(intent, 200);
+                }
+            }
+        });
+
+        binding.btnGo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(gpsInfo.isGetLocation()){
+                    map.clear();
+                    getPoly(new LatLng(gpsInfo.getLatitude(), gpsInfo.getLongitude()), new LatLng(end.getLat(), end.getLog()), new Callback() {
+                        @Override
+                        public void callback(PolylineOptions options) {
+
+                            map.addPolyline(options);
+                            addMarker("현재위치", gpsInfo.getLatitude(), gpsInfo.getLongitude(), false);
+                            addMarker("목적지", end.getLat(), end.getLog(), false);
+                            updateCamera(gpsInfo.getLatitude(), gpsInfo.getLongitude());
+//                            sendSMS(binding.editCallnum.getText().toString(), "TEST");
+                            polyDatas.clear();
+                            polyDatas.addAll(options.getPoints());
+                            startNavi();
+                        }
+                    });
+                }
+            }
+        });
+    }
+    double nowLat;
+    double nowLog;
+
+    Handler handler = new Handler();
+
+    private void startNavi(){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int count = 0;
+                int sec = 0;
+
+                nowLat = gpsInfo.getLatitude();
+                nowLog = gpsInfo.getLongitude();
+
+                while(true){
+                    try {
+                        Thread.sleep(1000);
+                        sec++;
+                        if(sec % 3 == 0){
+                            nowLat = polyDatas.get(count).latitude;
+                            nowLog = polyDatas.get(count++).longitude;
+
+                            for(int i = 0 ; i < polyDatas.size() ; i++){
+                                double dist = Util.distance(polyDatas.get(i).latitude, polyDatas.get(i).longitude, nowLat, nowLog, "meter");
+                                Log.d("dudco", dist+"");
+                                if(dist < 50){
+                                    polyDatas.remove(i);
+                                }
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            map.clear();
+                            addMarker(nowLat, nowLog);
+                            map.addPolyline(new PolylineOptions().addAll(polyDatas));
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
+    private void sendSMS(String phoneNum, String message){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if(checkSelfPermission(Manifest.permission.SEND_SMS)!= PackageManager.PERMISSION_GRANTED ||
+                    checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED){
+                requestPermissions(new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE}, 200);
+            }else{
+                _sendSMS(phoneNum, message);
+            }
+        }else{
+            _sendSMS(phoneNum, message);
+        }
+    }
 
+    private void _sendSMS(String phoneNum, String message){
+        PendingIntent intent = PendingIntent.getBroadcast(this, 0, new Intent("SENT_SMS"), 0);
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                switch (getResultCode()){
+                    case RESULT_OK:
+                        Toast.makeText(context, "문자 전송이 완료되었습니다", Toast.LENGTH_SHORT).show();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }, new IntentFilter("SENT_SMS"));
+        SmsManager sms = SmsManager.getDefault();
+        sms.sendTextMessage(phoneNum, null, message, intent, null);
+    }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -62,20 +189,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             double log = gpsInfo.getLongitude();
 
             Log.d("dudco", "lat: " + lat + "       log: " + log);
-//            zoomCamera(6.0f);
-            updateCamera(37.56461982743129 , 126.9823439963945);
-            addMarker("현재위치", 37.56461982743129 , 126.9823439963945 );
-
-//            getPoly(new Callback() {
-//                @Override
-//                public void callback(PolylineOptions options) {
-//                    map.addPolyline(options);
-//                }
-//            });
+            updateCamera(lat , log);
+            addMarker("현재위치", lat , log, false);
         }
     }
 
-    ArrayList<LatLng> datas = new ArrayList<>();
     private void getPoly(LatLng start, LatLng end, final Callback callback){
         AQuery aq = new AQuery(this);
         AjaxCallback<JSONObject> cb = new AjaxCallback<JSONObject>(){
@@ -94,12 +212,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                                 double lat = coordinates.getJSONArray(j).getDouble(1);
                                 double log = coordinates.getJSONArray(j).getDouble(0);
 
-                                datas.add(new LatLng(lat, log));
+                                polyDatas.add(new LatLng(lat, log));
                             }
                         }
                     }
 
-                    callback.callback(new PolylineOptions().addAll(datas).color(Color.RED).width(15));
+                    callback.callback(new PolylineOptions().addAll(polyDatas).color(Color.RED).width(15));
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -129,10 +247,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         map.animateCamera(CameraUpdateFactory.zoomTo(zoom));
     }
 
-    private void addMarker(String title, double lat, double log){
-        map.addMarker(new MarkerOptions()
-                .position(new LatLng(lat, log))
-                .title(title));
+    private void addMarker(String title, double lat, double log, boolean isMarkerRemove){
+        if(marker != null && isMarkerRemove){
+            marker.remove();
+        }
+        marker = map.addMarker(new MarkerOptions().title(title).position(new LatLng(lat, log)));
+    }
+
+    private void addMarker(double lat, double log){
+        marker.remove();
+        Log.d("dudco", "remove" + ":" + lat + "," + log);
+        addMarker("현재위치: " + lat + "," + log, lat, log, true);
+        addMarker("목적지", end.getLat(), end.getLog(), false);
+//        map.addMarker(new MarkerOptions().title("현재위치 : "+ lat + "," + log).position(new LatLng(lat, log)));
+//        marker = map.addMarker(new MarkerOptions().title("목적지").position(new LatLng(end.getLat(), end.getLog())));
     }
 
     private void permission(){
@@ -140,6 +268,22 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             if( checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
                     checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
                 requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 200);
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(resultCode == RESULT_OK){
+            if(requestCode == 200){
+                String name = data.getStringExtra("name");
+                String place = data.getStringExtra("place");
+                double _lat = data.getDoubleExtra("lat",37.56461982743129);
+                double _log = data.getDoubleExtra("log", 126.9823439963945);
+                binding.btnSearch.setText(name);
+                updateCamera(_lat, _log);
+                addMarker(place, _lat, _log, true);
+                end = new PlaceData(_lat, _log, name, place);
             }
         }
     }

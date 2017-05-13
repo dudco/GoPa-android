@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layout>
-    <LinearLayout
+    <RelativeLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
@@ -14,8 +14,86 @@
             android:id="@+id/map"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:cameraZoom="6"
+            app:cameraZoom="15"
             app:cameraTargetLat="126.9823439963945"
-            app:cameraTargetLng="37.56461982743129"/>
-    </LinearLayout>
+            app:cameraTargetLng="37.56461982743129"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            />
+
+        <android.support.v7.widget.Toolbar
+            android:layout_width="match_parent"
+            android:layout_height="?android:attr/actionBarSize"
+            android:background="#fff">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/icon"/>
+        </android.support.v7.widget.Toolbar>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_alignParentBottom="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/edit_box_background"
+                android:orientation="vertical"
+                android:layout_marginLeft="30dp"
+                android:layout_marginRight="30dp"
+                android:layout_marginBottom="20dp"
+                >
+
+                <com.example.dudco.gopa.CustomTextView
+                    android:id="@+id/btn_search"
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp"
+                    app:text_size_pt="36"
+                    app:text_font="NanumSquareRegular.ttf"
+                    android:hint="도착지 검색"
+                    android:background="#fff"
+                    android:layout_marginTop="5dp"
+                    android:layout_marginBottom="5dp"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"
+                    android:gravity="center_vertical"
+                    />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp" android:background="#878787"
+                    android:layout_marginLeft="5dp"
+                    android:layout_marginRight="5dp"
+                    />
+                <com.example.dudco.gopa.CustomEditText
+                    android:id="@+id/edit_callnum"
+                    android:layout_width="match_parent"
+                    android:layout_height="30dp"
+                    app:edit_size_pt="36"
+                    app:edit_font="NanumSquareRegular.ttf"
+                    android:hint="고객 전화번호"
+                    android:background="#fff"
+                    android:layout_marginTop="5dp"
+                    android:layout_marginBottom="5dp"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"
+                    />
+
+            </LinearLayout>
+
+            <com.example.dudco.gopa.CustomTextView
+                android:id="@+id/btn_go"
+                android:layout_width="match_parent"
+                android:layout_height="?android:attr/actionBarSize"
+                android:layout_alignParentBottom="true"
+                android:background="#dfe1eefe"
+                android:gravity="center"
+                android:text="출발하기"
+                app:text_size_pt="48"
+                app:text_font="NanumSquareRegular.ttf"/>
+        </LinearLayout>
+    </RelativeLayout>
 </layout>
