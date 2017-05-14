@@ -213,7 +213,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             public void onReceive(Context arg0, Intent arg1) {
                 switch (getResultCode()) {
                     case Activity.RESULT_OK:
-                        Toast.makeText(getBaseContext(), "SMS sent",
+                        Toast.makeText(getBaseContext(), "문자 전송이 완료되었습니다!",
                                 Toast.LENGTH_SHORT).show();
                         break;
                     case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
@@ -253,12 +253,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         }, new IntentFilter(DELIVERED));
 
-        Toast.makeText(this, "ㅁㄴㅇㄹ" + "   " + smsMessage.length(), Toast.LENGTH_SHORT).show();
+//        Toast.makeText(this, "ㅁㄴㅇㄹ" + "   " + smsMessage.length(), Toast.LENGTH_SHORT).show();
         new Thread(new Runnable() {
             @Override
             public void run() {
                 SmsManager sms = SmsManager.getDefault();
-                sms.sendTextMessage(phoneNumber, null, smsMessage, null, null);
+                sms.sendTextMessage(phoneNumber, null, smsMessage, sentPI, null);
             }
         }).start();
     }
