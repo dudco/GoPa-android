@@ -1,6 +1,7 @@
 package com.example.dudco.gopa;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -100,16 +101,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         public void callback(PolylineOptions options, int time) {
                             totalTime = time;
                             map.addPolyline(options);
-                            smsMessage = "현재 주문하신 음식이 약" + (time/60) +"분 후 도착할 예정입니다. ^~^\n" + "아래 사이트에서 좀 더 자세히 확인하세요!\n"+"http://soylatte.kr:3000/page/" + Util.token;
+                            smsMessage = "주문하신 음식이 약" + (time/60) +"분 후 도착할 예정입니다.\n" + "아래 사이트에서 확인하세요!\n"+"http://goo.gl/N7SXTt";
+
                             addMarker("현재위치", gpsInfo.getLatitude(), gpsInfo.getLongitude(), false);
                             addMarker("목적지", end.getLat(), end.getLog(), false);
                             updateCamera(gpsInfo.getLatitude(), gpsInfo.getLongitude());
-                            new Thread(new Runnable() {
-                                @Override
-                                public void run() {
-                                    sendSMS(binding.editCallnum.getText().toString(), smsMessage);
-                                }
-                            }).start();
+                            sendSMS(binding.editCallnum.getText().toString(), smsMessage);
                             polyDatas.clear();
                             polyDatas.addAll(options.getPoints());
                             Util.startRiding(MainActivity.this);
@@ -185,34 +182,120 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void sendSMS(String phoneNum, String message){
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!= PackageManager.PERMISSION_GRANTED ||
-                    checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED){
-                requestPermissions(new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE}, 1234);
+                    checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED ||
+                    checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED){
+                requestPermissions(new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_SMS}, 1234);
             }else{
-                sendSMSMSMSMS(phoneNum, message);
+                _sendSMS(phoneNum, message);
             }
         }else{
             sendSMSMSMSMS(phoneNum, message);
         }
     }
 
+    public void showToast(String str){
+        Toast.makeText(MainActivity.this, str, Toast.LENGTH_SHORT).show();
+    }
+
+    private void _sendSMS(final String phoneNumber, final String message) {
+        String SENT = "SMS_SENT";
+        String DELIVERED = "SMS_DELIVERED";
+
+        final PendingIntent sentPI = PendingIntent.getBroadcast(this, 0,
+                new Intent(SENT), 0);
+
+        final PendingIntent deliveredPI = PendingIntent.getBroadcast(this, 0,
+                new Intent(DELIVERED), 0);
+
+        //---when the SMS has been sent---
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context arg0, Intent arg1) {
+                switch (getResultCode()) {
+                    case Activity.RESULT_OK:
+                        Toast.makeText(getBaseContext(), "SMS sent",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+                        Toast.makeText(getBaseContext(), "Generic failure",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_NO_SERVICE:
+                        Toast.makeText(getBaseContext(), "No service",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_NULL_PDU:
+                        Toast.makeText(getBaseContext(), "Null PDU",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_RADIO_OFF:
+                        Toast.makeText(getBaseContext(), "Radio off",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                }
+            }
+        }, new IntentFilter(SENT));
+
+        //---when the SMS has been delivered---
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context arg0, Intent arg1) {
+                switch (getResultCode()) {
+                    case Activity.RESULT_OK:
+                        Toast.makeText(getBaseContext(), "SMS delivered",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        Toast.makeText(getBaseContext(), "SMS not delivered",
+                                Toast.LENGTH_SHORT).show();
+                        break;
+                }
+            }
+        }, new IntentFilter(DELIVERED));
+
+        Toast.makeText(this, "ㅁㄴㅇㄹ" + "   " + smsMessage.length(), Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SmsManager sms = SmsManager.getDefault();
+                sms.sendTextMessage(phoneNumber, null, smsMessage, null, null);
+            }
+        }).start();
+    }
+
     private void sendSMSMSMSMS(String phoneNum, String message){
         Log.d("dudco", "hello" + phoneNum + "");
-//        PendingIntent intent = PendingIntent.getBroadcast(this, 0, new Intent("SENT_SMS"), 0);
-//
-//        registerReceiver(new BroadcastReceiver() {
-//            @Override
-//            public void onReceive(Context context, Intent intent) {
-//                switch (getResultCode()){
-//                    case RESULT_OK:
-//                        Toast.makeText(context, "문자 전송이 완료되었습니다", Toast.LENGTH_SHORT).show();
-//                        break;
-//                    default:
-//                        break;
-//                }
-//            }
-//        }, new IntentFilter("SENT_SMS"));
+        PendingIntent intent = PendingIntent.getBroadcast(this, 0, new Intent("SMS_SENT"), 0);
+        registerReceiver(new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                switch (getResultCode()){
+                    case RESULT_OK:
+                        Toast.makeText(context, "문자 전송이 완료되었습니다", Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+                        // 전송 실패
+                        Toast.makeText(context, "전송 실패", Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_NO_SERVICE:
+                        // 서비스 지역 아님
+                        Toast.makeText(context, "서비스 지역이 아닙니다", Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_RADIO_OFF:
+                        // 무선 꺼짐
+                        Toast.makeText(context, "무선(Radio)가 꺼져있습니다", Toast.LENGTH_SHORT).show();
+                        break;
+                    case SmsManager.RESULT_ERROR_NULL_PDU:
+                        // PDU 실패
+                        Toast.makeText(context, "PDU Null", Toast.LENGTH_SHORT).show();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }, new IntentFilter("SMS_SENT"));
         SmsManager sms = SmsManager.getDefault();
-        sms.sendTextMessage(phoneNum, null, message, null, null);
+        sms.sendTextMessage(phoneNum, "01073507624", message, intent, null);
     }
 
     @Override
