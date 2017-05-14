@@ -27,7 +27,7 @@ import java.util.ArrayList;
 public class SearchActivity extends AppCompatActivity {
     private ActivitySearchBinding binding;
 
-    private String url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?radius=200000&&key=AIzaSyAPNQALkGv1v7UHnZS_-WALz031DM1FJiw&language=ko&location=";
+    private String url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?radius=200000&&key=AIzaSyDgRwVaFsYKrqPNGdGgBTfVcpSgeGpQytI&language=ko&location=";
     private ArrayAdapter<String> adapter;
     private ArrayList<PlaceData> datas = new ArrayList<>();
     @Override

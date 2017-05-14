@@ -20,6 +20,9 @@ import android.os.Bundle;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.TranslateAnimation;
 import android.widget.Toast;
 
 import com.androidquery.AQuery;
@@ -44,6 +47,7 @@ import org.json.JSONObject;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
 
@@ -56,9 +60,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private PlaceData end;
     private static Marker marker;
-    private ArrayList<LatLng> polyDatas = new ArrayList<>();
+    private LinkedList<LatLng> polyDatas = new LinkedList<>();
 
     private int totalTime;
+    private String smsMessage;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,15 +100,29 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         public void callback(PolylineOptions options, int time) {
                             totalTime = time;
                             map.addPolyline(options);
+                            smsMessage = "현재 주문하신 음식이 약" + (time/60) +"분 후 도착할 예정입니다. ^~^\n" + "아래 사이트에서 좀 더 자세히 확인하세요!\n"+"http://soylatte.kr:3000/page/" + Util.token;
                             addMarker("현재위치", gpsInfo.getLatitude(), gpsInfo.getLongitude(), false);
                             addMarker("목적지", end.getLat(), end.getLog(), false);
                             updateCamera(gpsInfo.getLatitude(), gpsInfo.getLongitude());
-//                            sendSMS(binding.editCallnum.getText().toString(), "TEST");
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    sendSMS(binding.editCallnum.getText().toString(), smsMessage);
+                                }
+                            }).start();
                             polyDatas.clear();
                             polyDatas.addAll(options.getPoints());
                             Util.startRiding(MainActivity.this);
                             emitData(end.getLat(), end.getLog(), gpsInfo.getLatitude(), gpsInfo.getLongitude(), totalTime);
-//                            startNavi();
+                            Animation translate = new TranslateAnimation(0, 0, 0, 1000);
+                            Animation alpha = new AlphaAnimation(1.0f, 0.0f);
+                            translate.setDuration(1000);
+                            translate.setFillAfter(true);
+                            alpha.setDuration(1000);
+                            alpha.setFillAfter(true);
+                            binding.uxContainer.startAnimation(alpha);
+                            binding.uxContainer.startAnimation(translate);
+                            startNavi();
                         }
                     });
                 }
@@ -118,7 +137,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         new Thread(new Runnable() {
             @Override
             public void run() {
-                int count = 0;
                 int sec = 0;
 
                 nowLat = gpsInfo.getLatitude();
@@ -129,16 +147,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         Thread.sleep(1000);
                         sec++;
                         if(sec % 3 == 0){
-                            nowLat = polyDatas.get(count).latitude;
-                            nowLog = polyDatas.get(count++).longitude;
+                            nowLat = polyDatas.get(1).latitude;
+                            nowLog = polyDatas.get(1).longitude;
 
-                            for(int i = 0 ; i < polyDatas.size() ; i++){
-                                double dist = Util.distance(polyDatas.get(i).latitude, polyDatas.get(i).longitude, nowLat, nowLog, "meter");
-                                Log.d("dudco", dist+"");
-                                if(dist < 50){
-                                    polyDatas.remove(i);
-                                }
+                            polyDatas.removeFirst();
+                            if(polyDatas.isEmpty()){
+                                break;
                             }
+//                            for(int i = 0 ; i < polyDatas.size() ; i++){
+//                                double dist = Util.distance(polyDatas.get(i).latitude, polyDatas.get(i).longitude, nowLat, nowLog, "meter");
+//                                Log.d("dudco", dist+"");
+//                                if(dist < 50){
+//                                    polyDatas.remove(i);
+//                                }
+//                            }
                         }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -148,8 +170,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         @Override
                         public void run() {
                             map.clear();
-                            addMarker(nowLat, nowLog);
                             map.addPolyline(new PolylineOptions().addAll(polyDatas));
+                            addMarker(nowLat, nowLog);
+                            updateCamera(nowLat, nowLog);
                         }
                     });
 
@@ -163,31 +186,33 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if(checkSelfPermission(Manifest.permission.SEND_SMS)!= PackageManager.PERMISSION_GRANTED ||
                     checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED){
-                requestPermissions(new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE}, 200);
+                requestPermissions(new String[]{Manifest.permission.SEND_SMS, Manifest.permission.READ_PHONE_STATE}, 1234);
             }else{
-                _sendSMS(phoneNum, message);
+                sendSMSMSMSMS(phoneNum, message);
             }
         }else{
-            _sendSMS(phoneNum, message);
+            sendSMSMSMSMS(phoneNum, message);
         }
     }
 
-    private void _sendSMS(String phoneNum, String message){
-        PendingIntent intent = PendingIntent.getBroadcast(this, 0, new Intent("SENT_SMS"), 0);
-        registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                switch (getResultCode()){
-                    case RESULT_OK:
-                        Toast.makeText(context, "문자 전송이 완료되었습니다", Toast.LENGTH_SHORT).show();
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }, new IntentFilter("SENT_SMS"));
+    private void sendSMSMSMSMS(String phoneNum, String message){
+        Log.d("dudco", "hello" + phoneNum + "");
+//        PendingIntent intent = PendingIntent.getBroadcast(this, 0, new Intent("SENT_SMS"), 0);
+//
+//        registerReceiver(new BroadcastReceiver() {
+//            @Override
+//            public void onReceive(Context context, Intent intent) {
+//                switch (getResultCode()){
+//                    case RESULT_OK:
+//                        Toast.makeText(context, "문자 전송이 완료되었습니다", Toast.LENGTH_SHORT).show();
+//                        break;
+//                    default:
+//                        break;
+//                }
+//            }
+//        }, new IntentFilter("SENT_SMS"));
         SmsManager sms = SmsManager.getDefault();
-        sms.sendTextMessage(phoneNum, null, message, intent, null);
+        sms.sendTextMessage(phoneNum, null, message, null, null);
     }
 
     @Override
@@ -198,7 +223,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             double lat= gpsInfo.getLatitude();
             double log = gpsInfo.getLongitude();
 
-            Log.d("dudco", "lat: " + lat + "       log: " + log);
+//            Log.d("dudco", "lat: " + lat + "       log: " + log);
             updateCamera(lat , log);
             addMarker("현재위치", lat , log, false);
         }
@@ -268,7 +293,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     private void addMarker(double lat, double log){
         marker.remove();
-        Log.d("dudco", "remove" + ":" + lat + "," + log);
+//        Log.d("dudco", "remove" + ":" + lat + "," + log);
         addMarker("현재위치: " + lat + "," + log, lat, log, true);
         addMarker("목적지", end.getLat(), end.getLog(), false);
     }
